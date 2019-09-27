@@ -42,7 +42,7 @@ password = getpass.win_getpass("Input your password: ")
 # options = Options()
 # options.headless = True
 try:
-    driver = webdriver.Chrome("./chromedriver.exe")
+    driver = webdriver.Chrome()
 except WebDriverException:
     print("Please download chromedriver executable and place it in the same directory as the python script or add it to your PATH")
     print("You can get the chromedriver here: https://sites.google.com/a/chromium.org/chromedriver/home")
