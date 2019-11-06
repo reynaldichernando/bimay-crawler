@@ -34,13 +34,11 @@ def getExtension(link):
     link = link[::-1]
     return link
 
-print("Input your username: ", end='')
-user_name = input()
-
-password = getpass.win_getpass("Input your password: ")
-
+# option headless untuk menjalankan chrome driver tanpa terbuka window chrome
 # options = Options()
 # options.headless = True
+
+#nngecek ada apa ga chrome drivernya
 try:
     driver = webdriver.Chrome()
 except WebDriverException:
@@ -48,12 +46,17 @@ except WebDriverException:
     print("You can get the chromedriver here: https://sites.google.com/a/chromium.org/chromedriver/home")
     input("Press enter to continue...")
     quit()
+
+#input email dan password user
+print("Input your username: ", end='')
+user_name = input()
+password = getpass.win_getpass("Input your password: ")
 driver.get('https://binusmaya.binus.ac.id/login/')
 driver.find_element_by_css_selector("input[type='text']").send_keys(user_name)
 driver.find_element_by_css_selector("input[type='password']").send_keys(password)
 driver.find_element_by_css_selector("input[type='submit']").click()
 
-
+#webdriverwait ini nunggu kalau css selector tersebut udah muncul di layar (soalnya loading bimay async), kalau lewat 30 detik bakal throw exception
 try:
     WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.CSS_SELECTOR, "ul[id='widget-current-courses'] li a")))
 except TimeoutException:
@@ -61,42 +64,55 @@ except TimeoutException:
     driver.quit()
     quit()
 
+#ngambil link" courses pada homepage dengan module beautiful soup lalu dimasukin ke list
 bimay_level1 = BeautifulSoup(driver.page_source, 'html.parser')
-
 courses = bimay_level1.select("ul[id='widget-current-courses'] li a")
 
+#buat folder baru
 try:
     os.mkdir("./resources")
 except FileExistsError as e:
     pass
 
+#looping tiap link course yg ada di array courses
 for course in courses:
+    #course text itu kayak .textContent kalau javascript, intinya ambil text dari tag <a></a>
     course_name = course.text
+
+    #buat folder dengan nama coursenya, terus namanya mesti di bersihkan, karena ada course dengan karakter terlarang kayak colon(:) dll
     pwd = "./resources/"
     pwd += cleanName(course_name)
     try:
         os.mkdir(pwd)
     except FileExistsError:
         pass
-    #pindah ke course lain, dengan ganti url
+
+
+    #masuk ke dalam link course, dan lgsg nembak halaman resource
     driver.get('https://binusmaya.binus.ac.id/newStudent/') #mesti balik ke main page, kalau engga, kode class ga ganti
     url = course['href'].replace("info", "resources")
     driver.get(url)
 
+    #cek kalau resource udah load karena loading async
     try:
         WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.CSS_SELECTOR, "ul[id='listNav']")))
     except TimeoutException:
         print("Loading took too long!")
         driver.quit()
         quit()
+
+    #masukin kelas" ke dalam list classes, karena ada matkul course 2, misal LAB dan LEC
     bimay_level2 = BeautifulSoup(driver.page_source, 'html.parser')
     classes = bimay_level2.select("select[id='ddlclasslist'] option") #ngeliat klo ad kelas
     for c in classes:
+        #akses kelas" tersebut dengan masukin url manual
         c_value = c['value']
         c_id = c['ssr-id']
         link = changeUrl(url, c_id, c_value)
         driver.get('https://binusmaya.binus.ac.id/newStudent/') #mesti balik ke main page, kalau engga, resourcenya ga muncul
         driver.get(link)
+        
+        #buat folder untuk tiap class
         pwd2 = pwd + '/' + c.text
         print(course.text+" ("+c.text+")")
         try:
@@ -104,8 +120,8 @@ for course in courses:
         except FileExistsError:
             pass
         
+        #validasi dibawah ini untuk cek kalau misalnya matakuliah atau class gaad resourcenya sama sekali, misalnya EESE
         no_data = False
-
         try:
             WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div[class='topic']>a>h4")))
         except TimeoutException:
@@ -118,6 +134,8 @@ for course in courses:
                 quit()
         if no_data:
             continue
+
+        #masukin judul resource, sesi keberapa, dan tanggal
         bimay_level3 = BeautifulSoup(driver.page_source, 'html.parser')
         topics = bimay_level3.select("div[class='topic']>a>h4")
         sessions = bimay_level3.select("h3[class='iWeek']")
@@ -125,8 +143,12 @@ for course in courses:
         resource_count = len(topics)
         sessions.pop(0) #index pertama di pop karena ada template yg punya css selector sama jadi dibersihkan
         dates.pop(0) #sama dengan sessions.pop(0)
+
+        #masukin download link ke list files
         files = bimay_level3.select("li[class='detailFiles']>div>a[class='iDownload icon icon-download']")
         for i in range(int(resource_count)):
+
+            #looping ini buat bikin nama file dengan format sesi, judul, tanggal + extension
             topic = topics[i].text
             session = sessions[i].text
             date = dates[i].text
@@ -135,8 +157,8 @@ for course in courses:
             file_name = session+" "+topic+" ("+date+")"+"."+getExtension(file_link)
             file_name = cleanName(file_name)
 
+            #download filenya secara binary, terus masukin ke folder
             download_file = requests.get(file_link, allow_redirects=True)
-
             print("Downloading "+file_name)
             with open(pwd2+"/"+file_name, "wb") as f:
                 f.write(download_file.content)
