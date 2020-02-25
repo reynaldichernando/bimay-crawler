@@ -40,11 +40,9 @@ def getExtension(link):
 
 #nngecek ada apa ga chrome drivernya
 try:
-    driver = webdriver.Chrome()
+    driver = webdriver.Edge()
 except WebDriverException:
-    print("Please download chromedriver executable and place it in the same directory as the python script or add it to your PATH")
-    print("You can get the chromedriver here: https://sites.google.com/a/chromium.org/chromedriver/home")
-    input("Press enter to continue...")
+    raise
     quit()
 
 #input email dan password user
@@ -153,12 +151,18 @@ for course in courses:
             session = sessions[i].text
             date = dates[i].text
             pfile = files[i]
-            file_link = pfile['href']
+            try:
+                file_link = 'https://binusmaya.binus.ac.id/services/ci/index.php/student/classes/downloadResource/'+pfile['path']+'/'+pfile['location']+'/'+pfile['filename']
+            except KeyError:
+                continue
             file_name = session+" "+topic+" ("+date+")"+"."+getExtension(file_link)
             file_name = cleanName(file_name)
 
+            if os.path.exists(pwd2+"/"+file_name):
+                continue
+
             #download filenya secara binary, terus masukin ke folder
-            download_file = requests.get(file_link, allow_redirects=True)
+            download_file = requests.get(file_link, allow_redirects=True, headers={'referer': 'https://binusmaya.binus.ac.id/newStudent/'})
             print("Downloading "+file_name)
             with open(pwd2+"/"+file_name, "wb") as f:
                 f.write(download_file.content)
